@@ -1,75 +1,192 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ImageBackground,
+  TouchableOpacity,
+  SafeAreaView,
+  Dimensions,
+  StatusBar,
+  Animated,
+  Image,
+} from "react-native";
+import { Link } from "expo-router";
+import { useEffect, useRef } from "react";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const { width, height } = Dimensions.get("window");
 
 export default function HomeScreen() {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <>
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+
+      <ImageBackground
+        source={require("../../assets/images/networking.jpg")}
+        style={styles.background}
+        resizeMode="cover"
+      >
+        <View style={styles.darkOverlay} />
+
+        <SafeAreaView style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
+        </SafeAreaView>
+
+        <Animated.View
+          style={[
+            styles.mainContent,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <Text style={styles.title}>
+            <Text style={styles.tealText}>A global platform </Text>
+            for <Text style={styles.orangeText}>social change</Text>,{" "}
+            <Text style={styles.orangeText}>social impact</Text>, and{"\n"}
+            <Text style={styles.orangeText}>
+              social-justice oriented{"\n"}networks
+            </Text>
+          </Text>
+
+          <Text style={styles.subtitle}>
+            Where network leaders and coordinators come together, share, and grow.
+          </Text>
+
+          <View style={styles.buttonContainer}>
+            <Link href="/signup" asChild>
+              <TouchableOpacity style={styles.signupBtn} activeOpacity={0.8}>
+                <Text style={styles.signupText}>SIGN UP</Text>
+              </TouchableOpacity>
+            </Link>
+            <Link href="/login" asChild>
+              <TouchableOpacity style={styles.loginBtn} activeOpacity={0.8}>
+                <Text style={styles.loginText}>LOGIN</Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
+        </Animated.View>
+      </ImageBackground>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  background: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
+  darkOverlay: {
+    position: "absolute",
+    top: 0,
     left: 0,
-    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  header: {
+    paddingTop: StatusBar.currentHeight || 44,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    alignItems: "center",
+    zIndex: 10,
+  },
+  logoContainer: {
+    alignItems: "center",
+  },
+  logoImage: {
+    width: 120,
+    height: 60,
+  },
+  mainContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 100,
+  },
+  title: {
+    fontSize: width > 400 ? 32 : 28,
+    fontWeight: "700",
+    color: "white",
+    lineHeight: width > 400 ? 44 : 38,
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  tealText: {
+    color: "#4dd0e1",
+  },
+  orangeText: {
+    color: "#ff6f00",
+  },
+  subtitle: {
+    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: 18,
+    lineHeight: 26,
+    marginBottom: 40,
+    fontWeight: "300",
+    textAlign: "center",
+    maxWidth: "90%",
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    gap: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  signupBtn: {
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    elevation: 3,
+  },
+  signupText: {
+    color: "#ff6f00",
+    fontWeight: "600",
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
+  loginBtn: {
+    backgroundColor: "#ff6f00",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    elevation: 4,
+  },
+  loginText: {
+    color: "white",
+    fontWeight: "600",
+    fontSize: 16,
+    letterSpacing: 0.5,
   },
 });
