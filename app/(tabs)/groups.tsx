@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+// CHANGE 1: Fix the import path - adjust based on your actual file structure
+import BottomNavFooter from '../../components/footer'; // or '@/components/footer/BottomNavFooter'
 import { storeToken, getToken } from '../authen/authStorage'; 
 import {
   View,
@@ -49,6 +51,9 @@ const InterestGroupsPage: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [joinLoading, setJoinLoading] = useState<number | null>(null);
   
+  // CHANGE 2: Add footer state management
+  const [activeTab, setActiveTab] = useState<string>('Community');
+  
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -88,6 +93,37 @@ const InterestGroupsPage: React.FC = () => {
       }
     };
   }, [searchQuery, groups]);
+
+  // CHANGE 3: Add footer navigation handler
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    
+    // Add your navigation logic here
+    switch (tabId) {
+      case 'Home':
+        // navigation.navigate('Home');
+        console.log('Navigating to Home');
+        break;
+      case 'Community':
+        // Already on community page
+        console.log('Already on Community');
+        break;
+      case 'Impact':
+        // navigation.navigate('Impact');
+        console.log('Navigating to Impact');
+        break;
+      case 'Resources':
+        // navigation.navigate('Resources');
+        console.log('Navigating to Resources');
+        break;
+      case 'More':
+        // navigation.navigate('More');
+        console.log('Navigating to More');
+        break;
+      default:
+        break;
+    }
+  };
 
   const fetchGroups = async (isRefresh = false) => {
     try {
@@ -454,6 +490,7 @@ const InterestGroupsPage: React.FC = () => {
     </Modal>
   );
 
+  // CHANGE 4: Fix loading state with proper footer props
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -462,10 +499,15 @@ const InterestGroupsPage: React.FC = () => {
           <ActivityIndicator size="large" color="#4c9c94" />
           <Text style={styles.loadingText}>Discovering groups...</Text>
         </View>
+        <BottomNavFooter 
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
       </SafeAreaView>
     );
   }
 
+  // CHANGE 5: Fix main return with proper footer props
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4c9c94" />
@@ -489,9 +531,14 @@ const InterestGroupsPage: React.FC = () => {
         ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
       />
       {renderGroupModal()}
+      <BottomNavFooter 
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+      />
     </SafeAreaView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
