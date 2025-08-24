@@ -12,6 +12,7 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
+import BottomNavFooter from '../../components/footer'; // Adjust path as needed
 
 interface XProfileField {
   name: string;
@@ -122,7 +123,6 @@ const MembersPage: React.FC = () => {
 
   const handleAddFriend = async (memberId: number, memberName: string) => {
     try {
-      // This would typically require authentication and proper API call
       Alert.alert('Success', `Friend request sent to ${memberName}!`);
     } catch (error) {
       Alert.alert('Error', 'Failed to send friend request. Please try again.');
@@ -131,7 +131,6 @@ const MembersPage: React.FC = () => {
 
   const handleSendMessage = async (memberId: number, memberName: string) => {
     try {
-      // This would typically open a message composer or navigate to messages
       Alert.alert('Success', `Message composer opened for ${memberName}!`);
     } catch (error) {
       Alert.alert('Error', 'Failed to open message composer. Please try again.');
@@ -139,17 +138,14 @@ const MembersPage: React.FC = () => {
   };
 
   const getLastActiveTime = (member: Member): string => {
-    // Try to extract last activity from various possible fields
     if (member.last_activity) {
       return formatTimeAgo(member.last_activity);
     }
     
-    // Fallback to registered date if available
     if (member.registered_date) {
       return formatTimeAgo(member.registered_date);
     }
     
-    // Generate random recent activity for demo (replace with actual data)
     const randomTimes = ['3 minutes ago', 'an hour ago', '5 days ago', '13 days ago', '21 days ago'];
     return randomTimes[member.id % randomTimes.length];
   };
@@ -242,22 +238,24 @@ const MembersPage: React.FC = () => {
 
   const renderHeader = () => (
     <View style={styles.header}>
+      <Text style={styles.pageTitle}>Community Members</Text>
+      
       <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search Members..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor="#999"
-        />
-        <TouchableOpacity style={styles.searchButton}>
-          <Text style={styles.searchButtonText}>SEARCH</Text>
-        </TouchableOpacity>
+        <View style={styles.searchInputContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search Members..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#999"
+          />
+        </View>
       </View>
 
       <View style={styles.statsContainer}>
         <Text style={styles.statsText}>
-          Viewing 1 - {Math.min(filteredMembers.length, 50)} of {filteredMembers.length} active members
+          {filteredMembers.length} active members found
         </Text>
       </View>
     </View>
@@ -265,202 +263,231 @@ const MembersPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4ECDC4" />
-          <Text style={[styles.loadingText, { marginTop: 16 }]}>Loading members...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.pageContainer}>
+        <SafeAreaView style={styles.container}>
+          <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>Loading members...</Text>
+          </View>
+        </SafeAreaView>
+        <BottomNavFooter activeTab="Community" />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
-      <FlatList
-        data={filteredMembers}
-        renderItem={renderMemberCard}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={3}
-        ListHeaderComponent={renderHeader}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        columnWrapperStyle={styles.row}
-      />
-    </SafeAreaView>
+    <View style={styles.pageContainer}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+        <FlatList
+          data={filteredMembers}
+          renderItem={renderMemberCard}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={3}
+          ListHeaderComponent={renderHeader}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          columnWrapperStyle={styles.row}
+        />
+      </SafeAreaView>
+      <BottomNavFooter activeTab="Community" />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  pageContainer: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f8f9fa',
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: '#6c757d',
+    marginTop: 16,
+    fontWeight: '500',
   },
   header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    marginBottom: 20,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-  },
-  searchInput: {
-    flex: 1,
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  searchButton: {
-    marginLeft: 8,
-    backgroundColor: '#E67E22',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 4,
-    justifyContent: 'center',
-  },
-  searchButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  statsContainer: {
-    marginBottom: 10,
-  },
-  statsText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  listContainer: {
-    paddingHorizontal: 16,
-  },
-  row: {
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  memberCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-    width: '31%',
-    elevation: 2,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+    marginBottom: 16,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  searchContainer: {
+    marginBottom: 20,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: 12,
+    color: '#6c757d',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#2c3e50',
+    fontWeight: '400',
+  },
+  statsContainer: {
+    alignItems: 'center',
+  },
+  statsText: {
+    fontSize: 16,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  row: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  memberCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    width: '31%',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#f1f3f4',
   },
   avatarContainer: {
     position: 'relative',
     marginBottom: 12,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f0f0f0',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#f1f3f4',
+    borderWidth: 3,
+    borderColor: '#ffffff',
   },
   friendBadge: {
     position: 'absolute',
     top: -2,
     right: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#4ECDC4',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#28a745',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#ffffff',
   },
   friendBadgeText: {
-    color: '#fff',
-    fontSize: 10,
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: 'bold',
   },
   memberName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2C3E50',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
     textAlign: 'center',
     marginBottom: 4,
     maxWidth: '100%',
   },
   lastActive: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 11,
+    color: '#6c757d',
     marginBottom: 16,
     textAlign: 'center',
+    fontWeight: '400',
   },
   actionButtons: {
     width: '100%',
-    gap: 8,
+    gap: 6,
   },
   addFriendButton: {
-    borderWidth: 1,
-    borderColor: '#4ECDC4',
-    paddingHorizontal: 12,
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 8,
     paddingVertical: 8,
-    borderRadius: 4,
+    borderRadius: 8,
     alignItems: 'center',
   },
   addFriendButtonText: {
-    color: '#4ECDC4',
-    fontSize: 11,
-    fontWeight: 'bold',
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   unfriendButton: {
-    borderWidth: 1,
-    borderColor: '#E74C3C',
-    paddingHorizontal: 12,
+    backgroundColor: '#dc3545',
+    paddingHorizontal: 8,
     paddingVertical: 8,
-    borderRadius: 4,
+    borderRadius: 8,
     alignItems: 'center',
   },
   unfriendButtonText: {
-    color: '#E74C3C',
-    fontSize: 11,
-    fontWeight: 'bold',
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   pendingButton: {
-    borderWidth: 1,
-    borderColor: '#F39C12',
-    paddingHorizontal: 12,
+    backgroundColor: '#ffc107',
+    paddingHorizontal: 8,
     paddingVertical: 8,
-    borderRadius: 4,
+    borderRadius: 8,
     alignItems: 'center',
   },
   pendingButtonText: {
-    color: '#F39C12',
-    fontSize: 11,
-    fontWeight: 'bold',
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   messageButton: {
-    backgroundColor: '#4ECDC4',
-    paddingHorizontal: 12,
+    backgroundColor: '#28a745',
+    paddingHorizontal: 8,
     paddingVertical: 8,
-    borderRadius: 4,
+    borderRadius: 8,
     alignItems: 'center',
   },
   messageButtonText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: 'bold',
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
   },
 });
 

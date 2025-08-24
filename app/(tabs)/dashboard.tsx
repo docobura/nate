@@ -13,31 +13,33 @@ import {
 } from "react-native";
 import { Link } from "expo-router";
 import { useState, useEffect, useRef } from "react";
-import { getToken } from '../authen/authStorage'; // Add this import
+import { getToken } from '../authen/authStorage'; 
+import BottomNavFooter from '../../components/footer';
+import { Ionicons, MaterialIcons, Feather, FontAwesome5 } from "@expo/vector-icons";
+
 
 const { width, height } = Dimensions.get("window");
 
 export default function LandingPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchFocused, setSearchFocused] = useState(false);
-  const [userName, setUserName] = useState<string>('User'); // Add state for user name
+  const [userName, setUserName] = useState<string>('User'); 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   const menuItems = [
-    { title: "Groups", icon: "👥", route: "/groups" as const, color: "#dbdde0", gradient: ["#dbdde0", "#d45929"] },
-    { title: "Members", icon: "👤", route: "/members" as const, color: "#dbdde0", gradient: ["#dbdde0", "#d45929"] },
-    { title: "Events", icon: "📅", route: "/events" as const, color: "#dbdde0", gradient: ["#dbdde0", "#d45929"] },
-    { title: "Friends", icon: "🤝", route: "/friends" as const, color: "#dbdde0", gradient: ["#dbdde0", "#d45929"] },
-    { title: "Forums", icon: "💬", route: "/forums" as const, color: "#dbdde0", gradient: ["#dbdde0", "#3a7a73"] },
-    { title: "courses", icon: "⚙️", route: "/courses" as const, color: "#dbdde0", gradient: ["#dbdde0", "#d45929"] },
-    { title: "Messages", icon: "💌", route: "/messages" as const, color: "#dbdde0", gradient: ["#dbdde0", "#3a7a73"] },
-    { title: "Podcasts", icon: "🎧", route: "/podcasts" as const, color: "#dbdde0", gradient: ["#dbdde0", "#d45929"] },
-    { title: "my groups", icon: "🤲", route: "/mymessages" as const, color: "#dbdde0", gradient: ["#dbdde0", "#3a7a73"] },
-    { title: "Gallery", icon: "🖼️", route: "/gallery" as const, color: "#dbdde0", gradient: ["#dbdde0", "#d45929"] },
-  ];
-
+  { title: "Groups", icon: <Ionicons name="people-outline" size={22} color="#333" />, route: "/groups", gradient: ["#dbdde0", "#d45929"], color: "#dbdde0" },
+  { title: "Members", icon: <Ionicons name="person-outline" size={22} color="#333" />, route: "/members", gradient: ["#dbdde0", "#d45929"], color: "#dbdde0" },
+  { title: "Events", icon: <Ionicons name="calendar-outline" size={22} color="#333" />, route: "/events", gradient: ["#dbdde0", "#d45929"], color: "#dbdde0" },
+  { title: "Friends", icon: <Ionicons name="hand-left-outline" size={22} color="#333" />, route: "/friends", gradient: ["#dbdde0", "#d45929"], color: "#dbdde0" },
+  { title: "Forums", icon: <MaterialIcons name="forum" size={22} color="#333" />, route: "/forums", gradient: ["#dbdde0", "#3a7a73"], color: "#dbdde0" },
+  { title: "Courses", icon: <Feather name="book-open" size={22} color="#333" />, route: "/courses", gradient: ["#dbdde0", "#d45929"], color: "#dbdde0" },
+  { title: "Messages", icon: <Ionicons name="mail-outline" size={22} color="#333" />, route: "/messages", gradient: ["#dbdde0", "#3a7a73"], color: "#dbdde0" },
+  { title: "Podcasts", icon: <Ionicons name="headset-outline" size={22} color="#333" />, route: "/podcasts", gradient: ["#dbdde0", "#d45929"], color: "#dbdde0" },
+  { title: "My Groups", icon: <FontAwesome5 name="layer-group" size={22} color="#333" />, route: "/mymessages", gradient: ["#dbdde0", "#3a7a73"], color: "#dbdde0" },
+//   { title: "Gallery", icon: <Ionicons name="images-outline" size={22} color="#333" />, route: "/gallery", gradient: ["#dbdde0", "#d45929"], color: "#dbdde0" },
+];
   const getGreeting = () => {
     const hour = currentTime.getHours();
     if (hour < 12) return "Good morning";
@@ -126,7 +128,7 @@ export default function LandingPage() {
               },
             ]}
           >
-            <Link href={item.route} asChild>
+            <Link href={item.route as any} asChild>
               <TouchableOpacity 
                 style={[styles.menuItem, { backgroundColor: item.color }]}
                 activeOpacity={0.8}
@@ -221,12 +223,12 @@ export default function LandingPage() {
             </View>
             
             {/* Enhanced Dots indicator */}
-            <View style={styles.dotsContainer}>
+            {/* <View style={styles.dotsContainer}>
               <View style={[styles.dot, styles.activeDot]} />
               <View style={styles.dot} />
               <View style={styles.dot} />
               <View style={styles.dot} />
-            </View>
+            </View> */}
           </Animated.View>
 
           {/* Enhanced Search Bar */}
@@ -271,61 +273,30 @@ export default function LandingPage() {
           >
             <View style={styles.quickStats}>
               <View style={styles.quickStatItem}>
-                <Text style={styles.quickStatNumber}>156</Text>
+                <Text style={styles.quickStatNumber}>2</Text>
                 <Text style={styles.quickStatLabel}>Friends</Text>
               </View>
               <View style={styles.quickStatDivider} />
               <View style={styles.quickStatItem}>
-                <Text style={styles.quickStatNumber}>8</Text>
+                <Text style={styles.quickStatNumber}>4</Text>
                 <Text style={styles.quickStatLabel}>Groups</Text>
               </View>
               <View style={styles.quickStatDivider} />
               <View style={styles.quickStatItem}>
-                <Text style={styles.quickStatNumber}>12</Text>
+                <Text style={styles.quickStatNumber}>3</Text>
                 <Text style={styles.quickStatLabel}>Messages</Text>
               </View>
             </View>
           </Animated.View>
 
-          {/* Enhanced Menu Grid */}
-          <AnimatedMenuGrid />
-        </ScrollView>
+        {/* Enhanced Menu Grid */}
+        <AnimatedMenuGrid />
+      </ScrollView>
 
-        {/* Enhanced Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          <View style={styles.bottomNavGradient} />
-          <TouchableOpacity style={[styles.bottomNavItem, styles.activeBottomNavItem]}>
-            <View style={styles.bottomNavIconContainer}>
-              <Text style={styles.bottomNavIcon}>🏠</Text>
-            </View>
-            <Text style={[styles.bottomNavText, styles.activeBottomNavText]}>Home</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomNavItem}>
-            <View style={styles.bottomNavIconContainer}>
-              <Text style={styles.bottomNavIcon}>👥</Text>
-            </View>
-            <Text style={styles.bottomNavText}>Community</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomNavItem}>
-            <View style={styles.bottomNavIconContainer}>
-              <Text style={styles.bottomNavIcon}>📊</Text>
-            </View>
-            <Text style={styles.bottomNavText}>Impact</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomNavItem}>
-            <View style={styles.bottomNavIconContainer}>
-              <Text style={styles.bottomNavIcon}>📚</Text>
-            </View>
-            <Text style={styles.bottomNavText}>Resources</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomNavItem}>
-            <View style={styles.bottomNavIconContainer}>
-              <Text style={styles.bottomNavIcon}>⚙️</Text>
-            </View>
-            <Text style={styles.bottomNavText}>More</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      {/* Enhanced Bottom Navigation */}
+
+    </SafeAreaView>
+    <BottomNavFooter />
     </>
   );
 }
@@ -634,9 +605,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     marginBottom: 8,
-  },
-  menuIcon: {
-    fontSize: 24,
+  // },
+  // menuIcon: {
+  //   fontSize: 24,
   },
   menuTitle: {
     fontSize: 12,

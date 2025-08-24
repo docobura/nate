@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Picker } from "@react-native-picker/picker";
 import {
   View,
@@ -61,6 +61,8 @@ type SignupPayload = {
 };
 
 const CreateAccountScreen: React.FC = () => {
+  console.log("🚀 CreateAccountScreen component mounted");
+
   const [formData, setFormData] = useState<FormData>({
     username: "",
     email: "",
@@ -74,13 +76,30 @@ const CreateAccountScreen: React.FC = () => {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const handleInputChange = (field: keyof FormData, value: string): void => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  // Log initial state
+  useEffect(() => {
+    console.log("📋 Initial form state:", {
+      fieldsCount: Object.keys(formData).length,
+      screenType: isTablet ? 'tablet' : isSmallScreen ? 'small' : 'normal',
+      screenDimensions: { width: screenWidth, height: screenHeight }
+    });
+  }, []);
 
+  const handleInputChange = (field: keyof FormData, value: string): void => {
+    console.log(`✏️ Input changed - ${field}: "${value}"`);
+    
+    setFormData((prev) => {
+      const newData = {
+        ...prev,
+        [field]: value,
+      };
+      console.log("📝 Updated form data:", newData);
+      return newData;
+    });
+
+    // Clear errors when user starts typing
     if (errors[field]) {
+      console.log(`✅ Clearing error for field: ${field}`);
       setErrors((prev) => ({
         ...prev,
         [field]: undefined,
@@ -89,42 +108,81 @@ const CreateAccountScreen: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
+    console.log("🔍 Starting form validation...");
+    console.log("📊 Current form data:", formData);
+    
     const newErrors: FormErrors = {};
 
+    // Username validation
     if (!formData.username.trim()) {
       newErrors.username = "Username is required";
+      console.log("❌ Username validation failed: empty");
+    } else {
+      console.log("✅ Username validation passed");
     }
 
+    // Email validation
     if (!formData.email.trim()) {
       newErrors.email = "Email address is required";
+      console.log("❌ Email validation failed: empty");
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address";
+      console.log("❌ Email validation failed: invalid format");
+    } else {
+      console.log("✅ Email validation passed");
     }
 
+    // Password validation
     if (!formData.password) {
       newErrors.password = "Password is required";
+      console.log("❌ Password validation failed: empty");
     } else if (formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters";
+      console.log(`❌ Password validation failed: too short (${formData.password.length} chars)`);
+    } else {
+      console.log("✅ Password validation passed");
     }
 
+    // Confirm password validation
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = "Please confirm your password";
+      console.log("❌ Confirm password validation failed: empty");
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
+      console.log("❌ Confirm password validation failed: passwords don't match");
+    } else {
+      console.log("✅ Confirm password validation passed");
     }
 
+    // Name validation
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
+      console.log("❌ Name validation failed: empty");
+    } else {
+      console.log("✅ Name validation passed");
+    }
+
+    const isValid = Object.keys(newErrors).length === 0;
+    console.log(`📊 Form validation result: ${isValid ? 'VALID' : 'INVALID'}`);
+    
+    if (!isValid) {
+      console.log("❌ Validation errors:", newErrors);
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return isValid;
   };
 
   const postDataToAPI = async (userData: SignupPayload): Promise<ApiResponse> => {
+    const API_URL = "https://nexus.inhiveglobal.org/wp-json/buddypress/v1/signup";
+    
+    console.log("🌐 Starting API call to:", API_URL);
+    console.log("📦 Request payload:", JSON.stringify(userData, null, 2));
+    
     try {
-      const API_URL = "https://nexus.inhiveglobal.org/wp-json/buddypress/v1/signup";
-
+      console.log("📡 Sending HTTP POST request...");
+      const startTime = Date.now();
+      
       const response = await fetch(API_URL, {
         method: "POST",
         headers: {
@@ -134,21 +192,37 @@ const CreateAccountScreen: React.FC = () => {
         body: JSON.stringify(userData),
       });
 
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      
+      console.log(`⏱️ API call completed in ${duration}ms`);
+      console.log("📈 Response status:", response.status);
+      console.log("📈 Response ok:", response.ok);
+
       const responseData = await response.json();
+      console.log("📨 Response data:", JSON.stringify(responseData, null, 2));
 
       if (!response.ok) {
+        console.log("❌ API call failed with error:", responseData);
         throw new Error(
           responseData.message || `HTTP error! status: ${response.status}`
         );
       }
 
+      console.log("✅ API call successful");
       return {
         success: true,
         message: responseData.message || "Account created successfully",
         data: responseData.data,
       };
     } catch (error) {
-      console.error("API Error:", error);
+      console.error("💥 API Error:", error);
+      console.error("🔍 Error details:", {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
+      
       return {
         success: false,
         message:
@@ -160,11 +234,18 @@ const CreateAccountScreen: React.FC = () => {
   };
 
   const handleSignUp = async (): Promise<void> => {
+    console.log("🎯 Sign up button pressed");
+    console.log("👤 User attempting signup with email:", formData.email);
+
+    // Validate form first
     if (!validateForm()) {
+      console.log("⛔ Signup aborted: form validation failed");
       return;
     }
 
+    console.log("✅ Form validation passed, proceeding with signup");
     setIsLoading(true);
+    console.log("⏳ Loading state set to true");
 
     try {
       const {
@@ -179,6 +260,8 @@ const CreateAccountScreen: React.FC = () => {
         interestGroup,
       } = formData;
 
+      console.log("🏗️ Building signup payload...");
+      
       const signup_field_data = [
         { field_id: 1, value: name },
         { field_id: 9, value: age },
@@ -187,6 +270,8 @@ const CreateAccountScreen: React.FC = () => {
         { field_id: 45, value: gender || "" },
       ];
 
+      console.log("📋 Signup field data:", signup_field_data);
+
       const apiData: SignupPayload = {
         user_login: username,
         user_email: email,
@@ -194,15 +279,21 @@ const CreateAccountScreen: React.FC = () => {
         signup_field_data,
       };
 
-      console.log("📦 Payload to API:", JSON.stringify(apiData, null, 2));
+      console.log("📦 Final API payload constructed:", JSON.stringify(apiData, null, 2));
 
+      // Call API
       const result = await postDataToAPI(apiData);
+      console.log("📊 API result:", result);
 
       if (result.success) {
+        console.log("🎉 Signup successful!");
+        console.log("📧 Success message:", result.message);
+        
         Alert.alert("Success!", result.message, [
           {
             text: "OK",
             onPress: () => {
+              console.log("🧹 Clearing form data after successful signup");
               setFormData({
                 username: "",
                 email: "",
@@ -219,18 +310,29 @@ const CreateAccountScreen: React.FC = () => {
           },
         ]);
       } else {
+        console.log("❌ Signup failed:", result.message);
         Alert.alert("Signup Failed", result.message || "Unknown error");
       }
     } catch (error: any) {
+      console.error("💥 Unexpected error during signup:", error);
       Alert.alert("API Error", error.message || "Something went wrong");
     } finally {
+      console.log("🏁 Signup process completed, clearing loading state");
       setIsLoading(false);
     }
   };
 
   const handleLogin = (): void => {
+    console.log("🔗 Login button pressed - should navigate to login screen");
     Alert.alert("Login", "Navigate to login screen");
   };
+
+  // Log render
+  console.log("🎨 Rendering CreateAccountScreen", {
+    hasErrors: Object.keys(errors).length > 0,
+    isLoading,
+    formDataComplete: Object.values(formData).every(val => val !== "")
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -388,9 +490,10 @@ const CreateAccountScreen: React.FC = () => {
                   >
                     <Picker
                       selectedValue={formData.age}
-                      onValueChange={(itemValue: string) =>
-                        handleInputChange("age", itemValue)
-                      }
+                      onValueChange={(itemValue: string) => {
+                        console.log("📅 Age range selected:", itemValue);
+                        handleInputChange("age", itemValue);
+                      }}
                       enabled={!isLoading}
                       style={styles.picker}
                     >
@@ -418,9 +521,10 @@ const CreateAccountScreen: React.FC = () => {
                   >
                     <Picker
                       selectedValue={formData.location}
-                      onValueChange={(itemValue: string) =>
-                        handleInputChange("location", itemValue)
-                      }
+                      onValueChange={(itemValue: string) => {
+                        console.log("🌍 Location selected:", itemValue);
+                        handleInputChange("location", itemValue);
+                      }}
                       enabled={!isLoading}
                       style={styles.picker}
                     >
@@ -447,9 +551,10 @@ const CreateAccountScreen: React.FC = () => {
                   >
                     <Picker
                       selectedValue={formData.interestGroup}
-                      onValueChange={(itemValue: string) =>
-                        handleInputChange("interestGroup", itemValue)
-                      }
+                      onValueChange={(itemValue: string) => {
+                        console.log("🎯 Interest group selected:", itemValue);
+                        handleInputChange("interestGroup", itemValue);
+                      }}
                       enabled={!isLoading}
                       style={styles.picker}
                     >
@@ -537,9 +642,10 @@ const CreateAccountScreen: React.FC = () => {
                   >
                     <Picker
                       selectedValue={formData.gender}
-                      onValueChange={(itemValue: string) =>
-                        handleInputChange("gender", itemValue)
-                      }
+                      onValueChange={(itemValue: string) => {
+                        console.log("🚻 Gender selected:", itemValue);
+                        handleInputChange("gender", itemValue);
+                      }}
                       enabled={!isLoading}
                       style={styles.picker}
                     >

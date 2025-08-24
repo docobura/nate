@@ -16,7 +16,9 @@ import {
   Dimensions,
 } from 'react-native';
 import { getToken } from '../authen/authStorage';
-import CourseDetailsComponent from '../(tabs)/courseinfo'; // Import the details component
+import CourseDetailsComponent from '../(tabs)/courseinfo'; 
+// CHANGE 1: Fix the footer import
+import BottomNavFooter from '../../components/footer'; // Adjust path as needed
 
 interface CourseInstructor {
   avatar: string;
@@ -82,13 +84,47 @@ const CoursesComponent: React.FC = () => {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categories, setCategories] = useState<CourseCategory[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null); // 🎯 ADD NAVIGATION STATE
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  
+  // CHANGE 2: Add footer state management
+  const [activeTab, setActiveTab] = useState<string>('Resources');
   
   // Refs
   const listRef = useRef<FlatList>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const API_BASE = 'https://nexus.inhiveglobal.org/wp-json';
+
+  // CHANGE 3: Add footer navigation handler
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    
+    // Add your navigation logic here
+    switch (tabId) {
+      case 'Home':
+        // navigation.navigate('Home');
+        console.log('Navigating to Home');
+        break;
+      case 'Community':
+        // navigation.navigate('Community');
+        console.log('Navigating to Community');
+        break;
+      case 'Impact':
+        // navigation.navigate('Impact');
+        console.log('Navigating to Impact');
+        break;
+      case 'Resources':
+        // Already on resources/courses page
+        console.log('Already on Resources');
+        break;
+      case 'More':
+        // navigation.navigate('More');
+        console.log('Navigating to More');
+        break;
+      default:
+        break;
+    }
+  };
 
   useEffect(() => {
     console.log('🚀 CoursesComponent: Component mounted');
@@ -119,13 +155,13 @@ const CoursesComponent: React.FC = () => {
     }
   };
 
-  const getAuthHeaders = async () => {
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
     console.log('🔐 Getting authentication headers');
     const token = await getToken();
     if (!token) {
       console.warn('⚠️ No authentication token found');
       Alert.alert('Authentication Error', 'Please log in again to access courses.');
-      return {};
+      return { 'Content-Type': 'application/json' };
     }
     console.log('✅ Token found, length:', token.length);
     return {
@@ -465,6 +501,7 @@ const CoursesComponent: React.FC = () => {
 
   const renderSeparator = () => <View style={styles.separator} />;
 
+  // CHANGE 4: Fix loading state with footer
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -473,11 +510,15 @@ const CoursesComponent: React.FC = () => {
           <ActivityIndicator size="large" color="#4c9c94" />
           <Text style={styles.loadingText}>Loading courses...</Text>
         </View>
+        <BottomNavFooter 
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
       </SafeAreaView>
     );
   }
 
-  // 🎯 SHOW COURSE DETAILS IF SELECTED
+  // 🎯 SHOW COURSE DETAILS IF SELECTED (No footer here since it's a different view)
   if (selectedCourseId) {
     return (
       <CourseDetailsComponent 
@@ -487,7 +528,7 @@ const CoursesComponent: React.FC = () => {
     );
   }
 
-  // 🎯 DEFAULT RENDER - SHOW COURSES LIST
+  // CHANGE 5: Fix main render with footer
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4c9c94" />
@@ -517,6 +558,11 @@ const CoursesComponent: React.FC = () => {
         initialNumToRender={10}
         maxToRenderPerBatch={5}
         windowSize={10}
+      />
+      
+      <BottomNavFooter 
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
       />
     </SafeAreaView>
   );
