@@ -1,462 +1,718 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-  ScrollView,
-  TouchableOpacity,
+    View,
+    Text,
+    StyleSheet,
+    FlatList,
+    TouchableOpacity,
+    TextInput,
+    ActivityIndicator,
+    Alert,
+    SafeAreaView,
+    StatusBar,
+    RefreshControl,
+    Animated,
+    Dimensions,
 } from 'react-native';
-import BottomNavFooter from '../../components/footer';
+import { getToken } from '../authen/authStorage';
+import PodcastPlayerComponent from '../../components/podcastcomponent';
+import BottomNavFooter from '../../components/footer'; // Import the footer component
 
-const PodcastsComingSoonPage: React.FC = () => {
-  return (
-    <View style={styles.pageContainer}>
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-        
-        <ScrollView 
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header Section */}
-          <View style={styles.header}>
-            <Text style={styles.pageTitle}>Podcasts</Text>
-            <Text style={styles.pageSubtitle}>
-              Listen to inspiring stories and insights from industry leaders
+interface PodcastTitle {
+    rendered: string;
+}
+
+interface PodcastContent {
+    rendered: string;
+    protected: boolean;
+}
+
+interface PodcastExcerpt {
+    rendered: string;
+    protected: boolean;
+}
+
+interface Podcast {
+    id: number;
+    date: string;
+    date_gmt: string;
+    modified: string;
+    modified_gmt: string;
+    slug: string;
+    status: string;
+    type: string;
+    link: string;
+    title: PodcastTitle;
+    content: PodcastContent;
+    excerpt: PodcastExcerpt;
+    author: number;
+    featured_media: number;
+    comment_status: string;
+    ping_status: string;
+    podcast_categories: number[];
+}
+
+interface User {
+    id: number;
+    name: string;
+    avatar_urls?: {
+        full: string;
+        thumb: string;
+    };
+}
+
+const { width } = Dimensions.get('window');
+
+const PodcastsComponent: React.FC = () => {
+    // State
+    const [podcasts, setPodcasts] = useState<Podcast[]>([]);
+    const [filteredPodcasts, setFilteredPodcasts] = useState<Podcast[]>([]);
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [refreshing, setRefreshing] = useState<boolean>(false);
+    const [selectedPodcast, setSelectedPodcast] = useState<Podcast | null>(null); // Navigation state
+
+    // Refs
+    const listRef = useRef<FlatList>(null);
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    const API_BASE = 'https://nexus.inhiveglobal.org/wp-json';
+
+    useEffect(() => {
+        console.log('🚀 PodcastsComponent: Component mounted');
+        initializeComponent();
+    }, []);
+
+    useEffect(() => {
+        console.log('🔍 Search query changed:', searchQuery);
+        filterPodcasts();
+    }, [searchQuery, podcasts]);
+
+    // Fade in animation on mount
+    useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
+    const initializeComponent = async () => {
+        console.log('🔧 Initializing podcasts component');
+        try {
+            await fetchCurrentUser();
+            await fetchPodcasts();
+        } catch (error) {
+            console.error('❌ Failed to initialize component:', error);
+        }
+    };
+
+    const getAuthHeaders = async () => {
+        console.log('🔐 Getting authentication headers');
+        const token = await getToken();
+        if (!token) {
+            console.warn('⚠️ No authentication token found');
+            // For podcasts, we might not need authentication for public content
+            return {
+                'Content-Type': 'application/json',
+            };
+        }
+        console.log('✅ Token found, length:', token.length);
+        return {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        };
+    };
+
+    const fetchCurrentUser = async () => {
+        console.log('👤 Fetching current user data');
+        try {
+            const headers = await getAuthHeaders();
+            if (headers.Authorization) {
+                const response = await fetch(`${API_BASE}/wp/v2/users/me`, { headers });
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    console.log('✅ Current user fetched:', {
+                        id: userData.id,
+                        name: userData.name,
+                    });
+                    setCurrentUser(userData);
+                } else {
+                    console.log('ℹ️ User not authenticated, continuing with public access');
+                }
+            }
+        } catch (error) {
+            console.log('ℹ️ Continuing without user authentication');
+        }
+    };
+
+    const fetchPodcasts = async (isRefresh = false) => {
+        console.log('📥 Fetching podcasts', isRefresh ? '(refresh)' : '(initial)');
+        try {
+            if (!isRefresh) setLoading(true);
+
+            const headers = await getAuthHeaders();
+
+            // API call to get podcasts
+            const response = await fetch(`${API_BASE}/wp/v2/podcasts?per_page=100&_embed=author`, { headers });
+
+            console.log('📡 API Response status:', response.status);
+
+            if (response.ok) {
+                const podcastsData = await response.json();
+                console.log('✅ Raw API Response:', podcastsData);
+                console.log('✅ Podcasts fetched successfully:', podcastsData.length, 'podcasts');
+
+                // Sort podcasts by date (most recent first)
+                const sortedPodcasts = podcastsData.sort((a: Podcast, b: Podcast) =>
+                    new Date(b.date).getTime() - new Date(a.date).getTime()
+                );
+
+                sortedPodcasts.forEach((podcast: Podcast, index: number) => {
+                    console.log(`🎙️ Podcast ${index + 1}:`, {
+                        id: podcast.id,
+                        title: podcast.title.rendered,
+                        date: podcast.date,
+                        categories: podcast.podcast_categories,
+                    });
+                });
+
+                setPodcasts(sortedPodcasts);
+                setFilteredPodcasts(sortedPodcasts);
+            } else {
+                const errorText = await response.text();
+                console.error('❌ Failed to fetch podcasts:', response.status, errorText);
+                throw new Error(`Failed to fetch podcasts: ${response.status} - ${errorText}`);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching podcasts:', error);
+            Alert.alert('Error', 'Failed to load podcasts. Please check your connection and try again.');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    const onRefresh = useCallback(() => {
+        console.log('🔄 Pull to refresh triggered');
+        setRefreshing(true);
+        fetchPodcasts(true);
+    }, []);
+
+    const filterPodcasts = () => {
+        if (!searchQuery.trim()) {
+            console.log('🔍 Clearing search filter');
+            setFilteredPodcasts(podcasts);
+            return;
+        }
+
+        console.log('🔍 Filtering podcasts with query:', searchQuery);
+        const filtered = podcasts.filter(podcast => {
+            const podcastContent = cleanHtmlContent(podcast.content.rendered);
+            const podcastExcerpt = cleanHtmlContent(podcast.excerpt.rendered);
+
+            const matches = (
+                podcast.title.rendered.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                podcastContent.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                podcastExcerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                podcast.slug.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            return matches;
+        });
+
+        console.log('🔍 Filter results:', filtered.length, 'out of', podcasts.length, 'podcasts');
+        setFilteredPodcasts(filtered);
+    };
+
+    const cleanHtmlContent = (htmlContent: string): string => {
+        return htmlContent.replace(/<[^>]*>/g, '').trim();
+    };
+
+    const formatDate = (dateString: string): string => {
+        const podcastDate = new Date(dateString);
+        const now = new Date();
+        const diffInMs = now.getTime() - podcastDate.getTime();
+        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+        const diffInDays = Math.floor(diffInHours / 24);
+
+        if (diffInHours < 1) {
+            const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+            return diffInMinutes < 1 ? 'Just now' : `${diffInMinutes}m ago`;
+        }
+
+        if (diffInHours < 24) return `${diffInHours}h ago`;
+        if (diffInDays === 1) return 'Yesterday';
+        if (diffInDays < 7) return `${diffInDays}d ago`;
+        if (diffInDays < 30) return `${Math.floor(diffInDays / 7)}w ago`;
+
+        return podcastDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    const extractAudioUrl = (content: string): string | null => {
+        const audioMatch = content.match(/src="([^"]*\.(?:mp3|m4a|wav|ogg))"/i);
+        return audioMatch ? audioMatch[1] : null;
+    };
+
+    const getDurationFromContent = (content: string): string => {
+        // This is a placeholder - you might want to extract actual duration from metadata
+        // or calculate it from the audio file
+        return 'Unknown duration';
+    };
+
+    // Navigate to podcast player
+    const handlePodcastPress = (podcast: Podcast) => {
+        console.log('🎯 Podcast pressed:', podcast.title.rendered);
+        const audioUrl = extractAudioUrl(podcast.content.rendered);
+        if (audioUrl) {
+            setSelectedPodcast(podcast); // Navigate to podcast player
+        } else {
+            Alert.alert('Error', 'Audio file not found for this podcast.');
+        }
+    };
+
+    // Back navigation handler
+    const handleBackToPodcasts = () => {
+        console.log('🔙 Returning to podcasts list');
+        setSelectedPodcast(null);
+    };
+
+    // Handle footer navigation
+    const handleTabPress = (tabId: string) => {
+        console.log('🔗 Footer tab pressed:', tabId);
+        // Handle specific navigation for different tabs
+        switch (tabId) {
+            case 'Home':
+                // Navigation is handled in the footer component
+                break;
+            case 'Resources':
+                console.log('📍 Already in Resources (Podcasts) section');
+                break;
+            case 'Community':
+                console.log('👥 Navigate to Community');
+                // Add navigation logic for Community if needed
+                break;
+            default:
+                console.log('❓ Unknown tab:', tabId);
+        }
+    };
+
+    const renderPodcastItem = ({ item, index }: { item: Podcast; index: number }) => {
+        const podcastDescription = cleanHtmlContent(item.excerpt.rendered) ||
+            cleanHtmlContent(item.content.rendered);
+        const audioUrl = extractAudioUrl(item.content.rendered);
+        const hasAudio = !!audioUrl;
+
+        return (
+            <Animated.View
+                style={[
+                    styles.podcastItemContainer,
+                    {
+                        opacity: fadeAnim,
+                        transform: [
+                            {
+                                translateY: fadeAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [50, 0],
+                                }),
+                            },
+                        ],
+                    },
+                ]}
+            >
+                <TouchableOpacity
+                    style={styles.podcastItem}
+                    onPress={() => handlePodcastPress(item)}
+                    activeOpacity={0.7}
+                    disabled={!hasAudio}
+                >
+                    {/* Podcast Header */}
+                    <View style={styles.podcastHeader}>
+                        <View style={styles.podcastIconContainer}>
+                            <Text style={styles.podcastIcon}>🎙️</Text>
+                        </View>
+
+                        <View style={styles.podcastTitleContainer}>
+                            <Text style={styles.podcastTitle} numberOfLines={2}>
+                                {item.title.rendered}
+                            </Text>
+                            <Text style={styles.podcastDate}>
+                                {formatDate(item.date)}
+                            </Text>
+                        </View>
+
+                        <View style={styles.playButtonContainer}>
+                            {hasAudio ? (
+                                <View style={[styles.playButton, styles.playButtonActive]}>
+                                    <Text style={styles.playButtonText}>▶️</Text>
+                                </View>
+                            ) : (
+                                <View style={[styles.playButton, styles.playButtonInactive]}>
+                                    <Text style={styles.playButtonTextInactive}>⚠️</Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* Podcast Content */}
+                    <View style={styles.podcastContent}>
+                        <Text style={styles.podcastDescription} numberOfLines={3}>
+                            {podcastDescription || 'No description available'}
+                        </Text>
+
+                        <View style={styles.podcastFooter}>
+                            <View style={styles.statusContainer}>
+                                <Text style={styles.statusIcon}>🔊</Text>
+                                <Text style={styles.statusText}>
+                                    {hasAudio ? 'Ready to play' : 'Audio unavailable'}
+                                </Text>
+                            </View>
+
+                            <View style={styles.categoryContainer}>
+                                <Text style={styles.categoryIcon}>📂</Text>
+                                <Text style={styles.categoryText}>
+                                    {item.podcast_categories.length > 0 ? 'Categorized' : 'General'}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                </TouchableOpacity>
+            </Animated.View>
+        );
+    };
+
+    const renderHeader = () => (
+        <View style={styles.header}>
+            <Text style={styles.headerTitle}>Podcasts</Text>
+            <Text style={styles.headerSubtitle}>
+                {podcasts.length} {podcasts.length === 1 ? 'episode' : 'episodes'}
             </Text>
-          </View>
 
-          {/* Coming Soon Card */}
-          <View style={styles.comingSoonCard}>
-            <View style={styles.iconContainer}>
-              <Text style={styles.podcastIcon}>🎧</Text>
+            <View style={styles.searchContainer}>
+                <View style={styles.searchInputContainer}>
+                    <Text style={styles.searchIcon}>🔍</Text>
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search podcasts..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholderTextColor="#999"
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                            <Text style={styles.clearIcon}>✕</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
             </View>
-            
-            <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
-            <Text style={styles.comingSoonDescription}>
-              Get ready for an immersive audio experience! We're curating amazing podcast content 
-              featuring industry experts, success stories, and actionable insights.
+        </View>
+    );
+
+    const renderEmptyState = () => (
+        <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>🎙️</Text>
+            <Text style={styles.emptyTitle}>No Podcasts Found</Text>
+            <Text style={styles.emptySubtitle}>
+                {searchQuery
+                    ? `No podcasts match "${searchQuery}"`
+                    : "No podcast episodes are available at the moment.\nCheck back later for new content!"
+                }
             </Text>
+        </View>
+    );
 
-            {/* Features Preview */}
-            <View style={styles.featuresContainer}>
-              <Text style={styles.featuresTitle}>What's Coming:</Text>
-              
-              <View style={styles.featureItem}>
-                <Text style={styles.featureIcon}>🎙️</Text>
-                <View style={styles.featureContent}>
-                  <Text style={styles.featureTitle}>Expert Interviews</Text>
-                  <Text style={styles.featureDescription}>
-                    Deep conversations with industry leaders and innovators
-                  </Text>
-                </View>
-              </View>
+    const renderSeparator = () => <View style={styles.separator} />;
 
-              <View style={styles.featureItem}>
-                <Text style={styles.featureIcon}>📚</Text>
-                <View style={styles.featureContent}>
-                  <Text style={styles.featureTitle}>Educational Series</Text>
-                  <Text style={styles.featureDescription}>
-                    Learn new skills and stay updated with industry trends
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Text style={styles.featureIcon}>💡</Text>
-                <View style={styles.featureContent}>
-                  <Text style={styles.featureTitle}>Success Stories</Text>
-                  <Text style={styles.featureDescription}>
-                    Inspiring journeys from entrepreneurs and thought leaders
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.featureItem}>
-                <Text style={styles.featureIcon}>⏰</Text>
-                <View style={styles.featureContent}>
-                  <Text style={styles.featureTitle}>Flexible Listening</Text>
-                  <Text style={styles.featureDescription}>
-                    Download, bookmark, and listen at your own pace
-                  </Text>
-                </View>
-              </View>
+    if (loading) {
+        return (
+            <View style={styles.pageContainer}>
+                <SafeAreaView style={styles.container}>
+                    <StatusBar barStyle="light-content" backgroundColor="#e46c34" />
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#e46c34" />
+                        <Text style={styles.loadingText}>Loading podcasts...</Text>
+                    </View>
+                </SafeAreaView>
+                <BottomNavFooter activeTab="Resources" onTabPress={handleTabPress} />
             </View>
+        );
+    }
 
-            {/* Call to Action */}
-            <TouchableOpacity style={styles.notifyButton}>
-              <Text style={styles.notifyButtonText}>Get Early Access</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Content Preview */}
-          <View style={styles.previewCard}>
-            <Text style={styles.previewTitle}>Content Preview</Text>
-            
-            <View style={styles.episodePreview}>
-              <View style={styles.episodeIcon}>
-                <Text style={styles.episodeNumber}>01</Text>
-              </View>
-              <View style={styles.episodeInfo}>
-                <Text style={styles.episodeTitle}>Building Resilient Teams</Text>
-                <Text style={styles.episodeGuest}>with Sarah Johnson, CEO of TechFlow</Text>
-                <Text style={styles.episodeDuration}>45 min • Leadership</Text>
-              </View>
+    // Conditional rendering - Show podcast player if selected
+    if (selectedPodcast) {
+        return (
+            <View style={styles.pageContainer}>
+                <PodcastPlayerComponent
+                    podcast={selectedPodcast}
+                    onBack={handleBackToPodcasts}
+                />
+                <BottomNavFooter activeTab="Resources" onTabPress={handleTabPress} />
             </View>
+        );
+    }
 
-            <View style={styles.episodePreview}>
-              <View style={styles.episodeIcon}>
-                <Text style={styles.episodeNumber}>02</Text>
-              </View>
-              <View style={styles.episodeInfo}>
-                <Text style={styles.episodeTitle}>The Future of Remote Work</Text>
-                <Text style={styles.episodeGuest}>with Marcus Chen, HR Director</Text>
-                <Text style={styles.episodeDuration}>38 min • Workplace</Text>
-              </View>
-            </View>
+    // Default render - Show podcasts list
+    return (
+        <View style={styles.pageContainer}>
+            <SafeAreaView style={styles.container}>
+                <StatusBar barStyle="light-content" backgroundColor="#e46c34" />
 
-            <View style={styles.episodePreview}>
-              <View style={styles.episodeIcon}>
-                <Text style={styles.episodeNumber}>03</Text>
-              </View>
-              <View style={styles.episodeInfo}>
-                <Text style={styles.episodeTitle}>Innovation in Fintech</Text>
-                <Text style={styles.episodeGuest}>with Dr. Emily Roberts, Fintech Expert</Text>
-                <Text style={styles.episodeDuration}>52 min • Technology</Text>
-              </View>
-            </View>
-          </View>
+                {renderHeader()}
 
-          {/* Progress Indicator */}
-          <View style={styles.progressCard}>
-            <Text style={styles.progressTitle}>Production Progress</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '60%' }]} />
-            </View>
-            <Text style={styles.progressText}>60% Complete</Text>
-            <Text style={styles.estimatedLaunch}>First Episodes: March 2024</Text>
-          </View>
-
-          {/* Newsletter Signup */}
-          <View style={styles.newsletterCard}>
-            <Text style={styles.newsletterTitle}>Stay Tuned</Text>
-            <Text style={styles.newsletterDescription}>
-              Be the first to know when new episodes drop and get exclusive behind-the-scenes content.
-            </Text>
-            
-            <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.primaryButton}>
-                <Text style={styles.primaryButtonText}>Subscribe for Updates</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Suggest Topics</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-      
-      <BottomNavFooter activeTab="Resources" />
-    </View>
-  );
+                <FlatList
+                    ref={listRef}
+                    data={filteredPodcasts}
+                    renderItem={renderPodcastItem}
+                    keyExtractor={(item) => item.id.toString()}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor="#e46c34"
+                            colors={["#e46c34"]}
+                        />
+                    }
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={[
+                        styles.listContainer,
+                        filteredPodcasts.length === 0 && styles.emptyListContainer
+                    ]}
+                    ListEmptyComponent={renderEmptyState}
+                    ItemSeparatorComponent={renderSeparator}
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={5}
+                    windowSize={10}
+                />
+            </SafeAreaView>
+            <BottomNavFooter activeTab="Resources" onTabPress={handleTabPress} />
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
-  pageContainer: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-    marginBottom: 16,
-    marginTop: 20,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  pageTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  pageSubtitle: {
-    fontSize: 16,
-    color: '#6c757d',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  comingSoonCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 24,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    alignItems: 'center',
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#fdf4f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  podcastIcon: {
-    fontSize: 40,
-  },
-  comingSoonTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  comingSoonDescription: {
-    fontSize: 16,
-    color: '#6c757d',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  featuresContainer: {
-    width: '100%',
-    marginBottom: 24,
-  },
-  featuresTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-  featureIcon: {
-    fontSize: 24,
-    marginRight: 12,
-    marginTop: 2,
-  },
-  featureContent: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 4,
-  },
-  featureDescription: {
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 20,
-  },
-  notifyButton: {
-    backgroundColor: '#e46c34',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 25,
-    elevation: 2,
-    shadowColor: '#e46c34',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  notifyButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  previewCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  previewTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  episodePreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f4',
-  },
-  episodeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#e46c34',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  episodeNumber: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  episodeInfo: {
-    flex: 1,
-  },
-  episodeTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 4,
-  },
-  episodeGuest: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 2,
-  },
-  episodeDuration: {
-    fontSize: 12,
-    color: '#9c9c9c',
-    fontWeight: '500',
-  },
-  progressCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  progressTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#e9ecef',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#e46c34',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e46c34',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  estimatedLaunch: {
-    fontSize: 12,
-    color: '#6c757d',
-    textAlign: 'center',
-  },
-  newsletterCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  newsletterTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  newsletterDescription: {
-    fontSize: 14,
-    color: '#6c757d',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: '#e46c34',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#4c9c94',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: '#4c9c94',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+    pageContainer: {
+        flex: 1,
+        backgroundColor: '#dbdde0',
+    },
+    container: {
+        flex: 1,
+        backgroundColor: '#dbdde0',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#666',
+        fontWeight: '500',
+    },
+    header: {
+        backgroundColor: '#e46c34',
+        paddingHorizontal: 20,
+        paddingTop: 50,
+        paddingBottom: 16,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    headerSubtitle: {
+        fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.8)',
+        marginBottom: 16,
+    },
+    searchContainer: {
+        marginBottom: 8,
+    },
+    searchInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        height: 44,
+    },
+    searchIcon: {
+        fontSize: 16,
+        marginRight: 12,
+        color: '#666',
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+        color: '#333',
+        padding: 0,
+    },
+    clearIcon: {
+        fontSize: 16,
+        color: '#999',
+        padding: 4,
+    },
+    listContainer: {
+        paddingTop: 12,
+        paddingHorizontal: 16,
+        paddingBottom: 20, // Add bottom padding for footer
+    },
+    emptyListContainer: {
+        flex: 1,
+    },
+    podcastItemContainer: {
+        marginBottom: 12,
+    },
+    podcastItem: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        overflow: 'hidden',
+        padding: 16,
+    },
+    podcastHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+    },
+    podcastIconContainer: {
+        width: 50,
+        height: 50,
+        backgroundColor: '#e46c34',
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    podcastIcon: {
+        fontSize: 24,
+    },
+    podcastTitleContainer: {
+        flex: 1,
+        marginRight: 12,
+    },
+    podcastTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#333',
+        marginBottom: 4,
+    },
+    podcastDate: {
+        fontSize: 12,
+        color: '#999',
+        fontWeight: '500',
+    },
+    playButtonContainer: {
+        justifyContent: 'center',
+    },
+    playButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    playButtonActive: {
+        backgroundColor: '#e46c34',
+    },
+    playButtonInactive: {
+        backgroundColor: '#f0f0f0',
+    },
+    playButtonText: {
+        fontSize: 16,
+        color: '#fff',
+    },
+    playButtonTextInactive: {
+        fontSize: 16,
+        color: '#999',
+    },
+    podcastContent: {
+        paddingLeft: 62, // Align with title container
+    },
+    podcastDescription: {
+        fontSize: 14,
+        color: '#666',
+        lineHeight: 20,
+        marginBottom: 12,
+    },
+    podcastFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    statusContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8f9fa',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    statusIcon: {
+        fontSize: 12,
+        marginRight: 4,
+    },
+    statusText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#e46c34',
+    },
+    categoryContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    categoryIcon: {
+        fontSize: 12,
+        marginRight: 4,
+    },
+    categoryText: {
+        fontSize: 12,
+        color: '#999',
+        fontWeight: '500',
+    },
+    separator: {
+        height: 8,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 40,
+    },
+    emptyIcon: {
+        fontSize: 64,
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
+    },
 });
 
-export default PodcastsComingSoonPage;
+export default PodcastsComponent;
